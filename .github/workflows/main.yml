@@ -1,4 +1,4 @@
-name: Build TensorFlow Lite for C on macOS
+name: Build TensorFlow Lite for C
 
 on:
   push:
@@ -20,28 +20,35 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: '3.9'
 
     - name: Install dependencies
       run: |
         brew install cmake
         pip install numpy
+        # Install sccache
+        brew install sccache
+        echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
 
     - name: Clone TensorFlow repository
       run: |
         git clone https://github.com/tensorflow/tensorflow.git
         cd tensorflow
-        git checkout v2.17.0
+        git checkout v2.14.0
 
     - name: Configure CMake
       run: |
         mkdir ${{ env.BUILD_DIR }}
-        cmake -S tensorflow/tensorflow/lite/c -B ${{ env.BUILD_DIR }} \
+        cd ${{ env.BUILD_DIR }}
+        cmake ../tensorflow/tensorflow/lite/c \
           -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_OSX_ARCHITECTURES=x86_64 \
           -DTFLITE_ENABLE_XNNPACK=ON
 
     - name: Build
-      run: cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 4
+      run: cmake --build ${{ env.BUILD_DIR }} --config Release --parallel $(sysctl -n hw.ncpu)
 
     - name: Archive artifacts
       uses: actions/upload-artifact@v3
