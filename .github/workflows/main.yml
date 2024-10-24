@@ -1,0 +1,50 @@
+name: Build TensorFlow Lite for C on macOS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  BUILD_DIR: tflite_build
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        brew install cmake
+        pip install numpy
+
+    - name: Clone TensorFlow repository
+      run: |
+        git clone https://github.com/tensorflow/tensorflow.git
+        cd tensorflow
+        git checkout v2.17.0
+
+    - name: Configure CMake
+      run: |
+        mkdir ${{ env.BUILD_DIR }}
+        cmake -S tensorflow/tensorflow/lite/c -B ${{ env.BUILD_DIR }} \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DTFLITE_ENABLE_XNNPACK=ON
+
+    - name: Build
+      run: cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 4
+
+    - name: Archive artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: tflite-lib
+        path: ${{ env.BUILD_DIR }}/libtensorflowlite_c.dylib
